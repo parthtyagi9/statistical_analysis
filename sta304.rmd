@@ -1,0 +1,76 @@
+---
+title: ""
+author: ""
+date: ""
+output:
+  pdf_document:
+    keep_tex: false
+    includes:
+      in_header: null
+header-includes:
+  - \usepackage{tikz}
+  - \usetikzlibrary{calc}
+  - \usepackage{xcolor}
+  - \definecolor{utblue}{RGB}{0, 42, 92}
+  - \definecolor{utlightblue}{RGB}{0, 127, 173}
+  - \raggedbottom
+---
+
+
+
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+\begin{titlepage}
+\thispagestyle{empty}
+
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[utblue] (current page.north west) rectangle ($(current page.north east) + (0, -1.2cm)$);
+  \fill[utlightblue, opacity=0.15] (current page.south west) rectangle ($(current page.south east) + (0, 3.5cm)$);
+\end{tikzpicture}
+
+\vspace*{2.5cm}
+
+\begin{center}
+
+{\fontsize{30}{36}\selectfont \textbf{\color{utblue}Collaborative Course Project}}
+
+\vspace{0.4cm}
+
+{\fontsize{18}{22}\selectfont \textbf{Data Analysis Report}}
+
+\vspace{2.8cm}
+
+{\fontsize{26}{31}\selectfont \color{utblue}\textbf{Statistical Analysis of Toronto Fire Incidents}}
+
+\vspace{2.3cm}
+
+{\fontsize{14}{17}\selectfont \textbf{Group 11}}
+
+\vspace{1.8cm}
+
+{\fontsize{12}{14}\selectfont
+\begin{tabular}{c}
+Aryan - (Manager) \\[0.15cm]
+Parth Tyagi (Manager) \\[0.15cm]
+Songqi(Mark) Kai (Editor) \\[0.15cm]
+Martin Ma (Editor) \\[0.15cm]
+Aarav Malhotra (Communicator) \\[0.15cm]
+Mir Asim Ali (Communicator)
+\end{tabular}
+}
+
+\vspace{2.5cm}
+
+{\fontsize{12}{14}\selectfont 
+\textbf{STA304H5 F} \\[0.2cm]
+University of Toronto Mississauga \\[0.2cm]
+2025 Fall Semester
+}
+
+\end{center}
+
+\end{titlepage}
