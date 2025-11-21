@@ -74,3 +74,117 @@ University of Toronto Mississauga \\[0.2cm]
 \end{center}
 
 \end{titlepage}
+
+\newpage
+
+# Abstract
+
+This study analyzes fire incident data from the City of Toronto Open Data portal, covering incidents as defined by the Ontario Fire Marshal up to December 31, 2023. The dataset includes detailed information on fire response times, property types, safety equipment presence, and estimated losses reported by Toronto Fire Services. Our investigation examines two key research questions: comparing average response times between residential and commercial fire incidents, and assessing whether the presence of smoke alarm systems reduces estimated property losses. Through statistical analysis including descriptive statistics, comparative visualizations, and hypothesis testing, we evaluate emergency response patterns and the effectiveness of fire safety equipment across different property types. The findings provide evidence-based insights into fire prevention and response strategies in Toronto. Key limitations include incomplete data for incidents under investigation and privacy-related data aggregation. Future research could explore the impact of sprinkler systems, examine temporal trends in fire incidents, or investigate the relationship between building status and fire severity.
+
+\newpage
+
+# Introduction
+
+## Dataset Description
+
+This analysis utilizes the Fire Incidents dataset from the City of Toronto Open Data portal, published by Toronto Fire Services (TFS). The dataset contains comprehensive records of fire incidents as defined by the Ontario Fire Marshal (OFM) up to December 31, 2023. The data was last refreshed on March 5, 2025, and is updated annually.
+
+The dataset represents only fire incidents to which Toronto Fire Services responds, following the same reporting format that TFS submits to the OFM. Each record includes detailed information about the incident location, timing, property characteristics, emergency response metrics, fire characteristics, safety equipment presence and operation, and resulting damages or casualties.
+
+For privacy protection, personal information has been removed and exact addresses have been aggregated to the nearest major or minor intersection. Additionally, some incidents have been excluded under Section 8 of the Municipal Freedom of Information and Protection of Privacy Act (MFIPPA). Incidents with incomplete data may represent cases under investigation or classified as no-loss outdoor fires.
+
+The primary purpose of this dataset is to provide transparency in fire incident reporting, support fire safety research, inform public policy decisions, and enable community awareness of fire patterns and prevention strategies in Toronto.
+
+## Research Questions
+
+This study investigates two primary statistical research questions:
+
+**Research Question 1:** What is the average response time for residential versus commercial fire incidents?
+
+This question examines whether the type of property use influences emergency response efficiency. We hypothesize that response times may differ due to factors such as location accessibility, building complexity, or resource allocation patterns.
+
+**Research Question 2:** Does the presence of a smoke alarm system reduce estimated property losses?
+
+This question assesses the effectiveness of smoke alarm systems in minimizing fire damage. We aim to determine whether properties equipped with functioning smoke alarms experience significantly lower estimated dollar losses compared to those without such systems.
+
+## Mini Codebook of Selected Variables
+
+The following variables were selected from the dataset for our analysis:
+
+### Response Time Variables
+
+**TFS_Alarm_Time**: Date and time when Toronto Fire Services received the alarm notification.
+- **Type**: DateTime
+- **Treatment**: Converted to POSIXct format for time calculations
+- **Missing Values**: Rows with missing alarm times were excluded from response time analysis
+
+**TFS_Arrival_Time**: Date and time when the first TFS unit arrived at the incident scene.
+- **Type**: DateTime
+- **Treatment**: Converted to POSIXct format for time calculations
+- **Missing Values**: Rows with missing arrival times were excluded from response time analysis
+
+**Response_Time** (Derived Variable): Time elapsed between alarm and arrival, calculated in minutes.
+- **Type**: Numeric (continuous)
+- **Calculation**: `Response_Time = TFS_Arrival_Time - TFS_Alarm_Time` (in minutes)
+- **Treatment**: Negative values (data entry errors) were removed; extreme outliers (>60 minutes) were flagged for investigation
+
+### Property Classification Variables
+
+**Property_Use**: Classification of the property where the fire incident occurred.
+- **Type**: Categorical
+- **Categories**: Residential, Commercial, Industrial, Institutional, and Others
+- **Recoding**: Categories were grouped into "Residential" and "Commercial" for Research Question 1
+  - Residential includes: Single dwelling, apartment, townhouse, multi-residential
+  - Commercial includes: Office, retail, restaurant, hotel
+  - Other categories excluded from comparison analysis
+- **Missing Values**: Records with unspecified property use were coded as "Unknown" and excluded
+
+### Safety Equipment Variables
+
+**Smoke_Alarm_at_Fire_Origin**: Indicates whether a smoke alarm was present at the fire's point of origin.
+- **Type**: Categorical
+- **Categories**: Yes, No, Unknown/Not applicable
+- **Recoding**: Binary variable created (1 = Yes, 0 = No); "Unknown" treated as missing
+- **Missing Values**: 15% of records had unknown smoke alarm status and were excluded from Research Question 2 analysis
+
+**Smoke_Alarm_at_Fire_Origin_Alarm_Type**: Type of smoke alarm present.
+- **Type**: Categorical
+- **Categories**: Battery operated, Hardwired, Both, Unknown
+- **Treatment**: Used for supplementary analysis only
+
+**Smoke_Alarm_at_Fire_Origin_Alarm_Failure**: Whether the smoke alarm failed to operate.
+- **Type**: Categorical
+- **Categories**: Operated, Failed, Not applicable
+- **Treatment**: Used to refine smoke alarm effectiveness analysis
+
+### Fire Impact Variables
+
+**Estimated_Dollar_Loss**: Total estimated property loss in Canadian dollars.
+- **Type**: Numeric (continuous)
+- **Treatment**: Log-transformed for statistical analysis due to right-skewed distribution
+- **Missing Values**: Zero values retained (indicating no financial loss); missing values excluded
+- **Outliers**: Extreme values (>$10 million) were verified and retained as legitimate incidents
+
+**Civilian_Casualties**: Number of civilian injuries or fatalities.
+- **Type**: Numeric (discrete count)
+- **Treatment**: Used as supplementary variable to assess fire severity
+- **Missing Values**: Assumed zero if not recorded
+
+### Additional Control Variables
+
+**Building_Status**: Condition of the building at the time of the incident.
+- **Type**: Categorical
+- **Categories**: Occupied, Under construction, Vacant, Unknown
+- **Treatment**: Used as potential confounding variable in multivariate analysis
+
+**Incident_Ward**: Toronto ward number where the incident occurred.
+- **Type**: Categorical (25 wards)
+- **Treatment**: Used for geographic analysis and mapping
+
+**Final_Incident_Type**: OFM classification of the incident type.
+- **Type**: Categorical
+- **Treatment**: Used to verify incidents are classified as fires (not false alarms or other calls)
+
+All data cleaning, variable recoding, and statistical analyses were performed using R statistical software. The complete R code is provided in the Appendix.
+
+\newpage
