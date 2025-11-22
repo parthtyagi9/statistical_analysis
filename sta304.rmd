@@ -188,3 +188,78 @@ The following variables were selected from the dataset for our analysis:
 All data cleaning, variable recoding, and statistical analyses were performed using R statistical software. The complete R code is provided in the Appendix.
 
 \newpage
+
+# Appendix
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+```
+
+```{r}
+# 1. Load the raw data
+fire_data <- read.csv("Fire Incidents Data.csv")
+
+# 2. Fix date formats and calculate Response Time
+# Remove "T" from timestamps
+fire_data$TFS_Alarm_Time <- gsub("T", " ", fire_data$TFS_Alarm_Time)
+fire_data$TFS_Arrival_Time <- gsub("T", " ", fire_data$TFS_Arrival_Time)
+
+# Parse dates
+fire_data$TFS_Alarm_Time <- ymd_hms(fire_data$TFS_Alarm_Time)
+fire_data$TFS_Arrival_Time <- ymd_hms(fire_data$TFS_Arrival_Time)
+
+# Calculate response time
+fire_data$Response_Time <- as.numeric(difftime(fire_data$TFS_Arrival_Time, 
+                                               fire_data$TFS_Alarm_Time, 
+                                               units = "mins"))
+
+# Filter for valid response times (0 to 60 mins)
+fire_data <- fire_data[!is.na(fire_data$Response_Time), ]
+fire_data <- fire_data[fire_data$Response_Time >= 0 & fire_data$Response_Time <= 60, ]
+```
+
+```{r}
+# 3. Group Property Use (Residential vs Commercial)
+res_pattern <- "Dwelling|Apartment|Home|House|Residential|Townhouse"
+comm_pattern <- "Restaurant|Commercial|Office|Store|Retail|Business|Hotel|Warehouse"
+
+fire_data$Property_Group <- NA
+fire_data$Property_Group[grepl(res_pattern, fire_data$Property_Use, ignore.case = TRUE)] <- "Residential"
+fire_data$Property_Group[grepl(comm_pattern, fire_data$Property_Use, ignore.case = TRUE)] <- "Commercial"
+
+# Filter to keep only these two groups
+fire_data <- fire_data[!is.na(fire_data$Property_Group), ]
+```
+
+```{r}
+# 4. Clean Smoke Alarm variable
+fire_data$Smoke_Alarm_Binary <- NA
+
+# If it says "present", set to 1
+fire_data$Smoke_Alarm_Binary[grepl("present", fire_data$Smoke_Alarm_at_Fire_Origin, ignore.case = TRUE)] <- 1
+
+# If it says "No smoke alarm", set to 0
+fire_data$Smoke_Alarm_Binary[grepl("No smoke alarm", fire_data$Smoke_Alarm_at_Fire_Origin, ignore.case = TRUE)] <- 0
+
+# Remove NAs (undetermined or blank rows)
+fire_data <- fire_data[!is.na(fire_data$Smoke_Alarm_Binary), ]
+```
+
+```{r}
+# 5. Handle Financial Loss
+fire_data$Estimated_Dollar_Loss <- gsub(",", "", fire_data$Estimated_Dollar_Loss)
+fire_data$Estimated_Dollar_Loss <- as.numeric(fire_data$Estimated_Dollar_Loss)
+
+# Remove rows with missing loss data
+fire_data <- fire_data[!is.na(fire_data$Estimated_Dollar_Loss), ]
+
+# Log-transform the loss variable
+fire_data$log_loss <- log(fire_data$Estimated_Dollar_Loss + 1)
+```
+
+```{r}
+# Final check of the dataset
+str(fire_data)
+```
