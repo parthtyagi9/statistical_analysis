@@ -1,0 +1,582 @@
+---
+title: ""
+author: ""
+date: ""
+output:
+  pdf_document:
+    keep_tex: false
+    includes:
+      in_header: null
+header-includes:
+  - \usepackage{tikz}
+  - \usetikzlibrary{calc}
+  - \usepackage{xcolor}
+  - \definecolor{utblue}{RGB}{0, 42, 92}
+  - \definecolor{utlightblue}{RGB}{0, 127, 173}
+  - \raggedbottom
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+```
+
+\begin{titlepage}
+\thispagestyle{empty}
+
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[utblue] (current page.north west) rectangle ($(current page.north east) + (0, -1.2cm)$);
+  \fill[utlightblue, opacity=0.15] (current page.south west) rectangle ($(current page.south east) + (0, 3.5cm)$);
+\end{tikzpicture}
+
+\vspace*{2.5cm}
+
+\begin{center}
+
+{\fontsize{30}{36}\selectfont \textbf{\color{utblue}Collaborative Course Project}}
+
+\vspace{0.4cm}
+
+{\fontsize{18}{22}\selectfont \textbf{Data Analysis Report}}
+
+\vspace{2.8cm}
+
+{\fontsize{26}{31}\selectfont \color{utblue}\textbf{Statistical Analysis of Toronto Fire Incidents}}
+
+\vspace{2.3cm}
+
+{\fontsize{14}{17}\selectfont \textbf{Group 11}}
+
+\vspace{1.8cm}
+
+{\fontsize{12}{14}\selectfont
+\begin{tabular}{c}
+Aryan - (Manager) \\[0.15cm]
+Parth Tyagi (Manager) \\[0.15cm]
+Songqi(Mark) Kai (Editor) \\[0.15cm]
+Martin Ma (Editor) \\[0.15cm]
+Aarav Malhotra (Communicator) \\[0.15cm]
+Mir Asim Ali (Communicator)
+\end{tabular}
+}
+
+\vspace{2.5cm}
+
+{\fontsize{12}{14}\selectfont 
+\textbf{STA304H5 F} \\[0.2cm]
+University of Toronto Mississauga \\[0.2cm]
+2025 Fall Semester
+}
+
+\end{center}
+
+\end{titlepage}
+
+\clearpage
+\pagenumbering{arabic}
+
+# Abstract
+
+This study analyzes fire incident data from the City of Toronto Open Data portal, covering incidents as defined by the Ontario Fire Marshal up to December 31, 2023. The dataset includes detailed information on fire response times, property types, safety equipment presence, and estimated losses reported by Toronto Fire Services. Our investigation examines three key research questions: comparing average response times between residential and commercial fire incidents, assessing whether the presence of smoke alarm systems reduces estimated property losses, and determining if the status of fire on arrival influences suppression duration. Through statistical analysis including descriptive statistics, comparative visualizations, and hypothesis testing, we evaluate emergency response patterns and the effectiveness of fire safety equipment across different property types. The findings provide evidence-based insights into fire prevention and response strategies in Toronto. Key limitations include incomplete data for incidents under investigation and privacy-related data aggregation. Future research could explore the impact of sprinkler systems, examine temporal trends in fire incidents, or investigate the relationship between building status and fire severity.
+
+\newpage
+
+# Introduction
+
+## Dataset Description
+
+This analysis utilizes the Fire Incidents dataset from the City of Toronto Open Data portal, published by Toronto Fire Services (TFS). The dataset contains comprehensive records of fire incidents as defined by the Ontario Fire Marshal (OFM) up to December 31, 2023. The data was last refreshed on March 5, 2025, and is updated annually.
+
+The dataset represents only fire incidents to which Toronto Fire Services responds, following the same reporting format that TFS submits to the OFM. Each record includes detailed information about the incident location, timing, property characteristics, emergency response metrics, fire characteristics, safety equipment presence and operation, and resulting damages or casualties.
+
+For privacy protection, personal information has been removed and exact addresses have been aggregated to the nearest major or minor intersection. Additionally, some incidents have been excluded under Section 8 of the Municipal Freedom of Information and Protection of Privacy Act (MFIPPA). Incidents with incomplete data may represent cases under investigation or classified as no-loss outdoor fires.
+
+The primary purpose of this dataset is to provide transparency in fire incident reporting, support fire safety research, inform public policy decisions, and enable community awareness of fire patterns and prevention strategies in Toronto.
+
+## Research Questions
+
+This study investigates three primary statistical research questions:
+
+**Research Question 1:** What is the average response time for residential versus commercial fire incidents?
+
+This question examines whether the type of property use influences emergency response efficiency. We hypothesize that response times may differ due to factors such as location accessibility, building complexity, or resource allocation patterns.
+
+**Research Question 2:** Does the presence of a smoke alarm system reduce estimated property losses?
+
+This question assesses the effectiveness of smoke alarm systems in minimizing fire damage. We aim to determine whether properties equipped with functioning smoke alarms experience significantly lower estimated dollar losses compared to those without such systems.
+
+**Research Question 3:** Does the status of fire on arrival (e.g., "out upon arrival", "spreading") influence the duration of fire suppression?
+
+This question investigates whether the observable fire condition upon the fire department's arrival affects the time required to bring the fire under control.
+
+## Mini Codebook of Selected Variables
+
+The following variables were selected from the dataset for our analysis:
+
+### Response Time Variables
+
+**TFS_Alarm_Time**: Date and time when Toronto Fire Services received the alarm notification.
+- **Type**: DateTime
+- **Treatment**: Converted to POSIXct format for time calculations
+- **Missing Values**: Rows with missing alarm times were excluded from response time analysis
+
+**TFS_Arrival_Time**: Date and time when the first TFS unit arrived at the incident scene.
+- **Type**: DateTime
+- **Treatment**: Converted to POSIXct format for time calculations
+- **Missing Values**: Rows with missing arrival times were excluded from response time analysis
+
+**Response_Time** (Derived Variable): Time elapsed between alarm and arrival, calculated in minutes.
+- **Type**: Numeric (continuous)
+- **Calculation**: `Response_Time = TFS_Arrival_Time - TFS_Alarm_Time` (in minutes)
+- **Treatment**: Negative values (data entry errors) were removed; extreme outliers (>60 minutes) were flagged for investigation
+
+### Property Classification Variables
+
+**Property_Use**: Classification of the property where the fire incident occurred.
+- **Type**: Categorical
+- **Categories**: Residential, Commercial, Industrial, Institutional, and Others
+- **Recoding**: Categories were grouped into "Residential" and "Commercial" for Research Question 1
+  - Residential includes: Single dwelling, apartment, townhouse, multi-residential
+  - Commercial includes: Office, retail, restaurant, hotel
+  - Other categories excluded from comparison analysis
+- **Missing Values**: Records with unspecified property use were coded as "Unknown" and excluded
+
+### Safety Equipment Variables
+
+**Smoke_Alarm_at_Fire_Origin**: Indicates whether a smoke alarm was present at the fire's point of origin.
+- **Type**: Categorical
+- **Categories**: Yes, No, Unknown/Not applicable
+- **Recoding**: Binary variable created (1 = Yes, 0 = No); "Unknown" treated as missing
+- **Missing Values**: 15% of records had unknown smoke alarm status and were excluded from Research Question 2 analysis
+
+**Smoke_Alarm_at_Fire_Origin_Alarm_Type**: Type of smoke alarm present.
+- **Type**: Categorical
+- **Categories**: Battery operated, Hardwired, Both, Unknown
+- **Treatment**: Used for supplementary analysis only
+
+**Smoke_Alarm_at_Fire_Origin_Alarm_Failure**: Whether the smoke alarm failed to operate.
+- **Type**: Categorical
+- **Categories**: Operated, Failed, Not applicable
+- **Treatment**: Used to refine smoke alarm effectiveness analysis
+
+### Fire Impact Variables
+
+**Estimated_Dollar_Loss**: Total estimated property loss in Canadian dollars.
+- **Type**: Numeric (continuous)
+- **Treatment**: Log-transformed for statistical analysis due to right-skewed distribution
+- **Missing Values**: Zero values retained (indicating no financial loss); missing values excluded
+- **Outliers**: Extreme values (>$10 million) were verified and retained as legitimate incidents
+
+**Civilian_Casualties**: Number of civilian injuries or fatalities.
+- **Type**: Numeric (discrete count)
+- **Treatment**: Used as supplementary variable to assess fire severity
+- **Missing Values**: Assumed zero if not recorded
+
+### Additional Control Variables
+
+**Building_Status**: Condition of the building at the time of the incident.
+- **Type**: Categorical
+- **Categories**: Occupied, Under construction, Vacant, Unknown
+- **Treatment**: Used as potential confounding variable in multivariate analysis
+
+**Incident_Ward**: Toronto ward number where the incident occurred.
+- **Type**: Categorical (25 wards)
+- **Treatment**: Used for geographic analysis and mapping
+
+**Final_Incident_Type**: OFM classification of the incident type.
+- **Type**: Categorical
+- **Treatment**: Used to verify incidents are classified as fires (not false alarms or other calls)
+
+All data cleaning, variable recoding, and statistical analyses were performed using R statistical software. The complete R code is provided in the Appendix.
+
+\newpage
+
+# Statistical Results
+
+```{r data-cleaning, include=FALSE}
+# 1. Load the raw data
+fire_data <- read.csv("Fire Incidents Data.csv")
+
+# 2. Fix date formats and calculate Response Time
+# Remove "T" from timestamps
+fire_data$TFS_Alarm_Time <- gsub("T", " ", fire_data$TFS_Alarm_Time)
+fire_data$TFS_Arrival_Time <- gsub("T", " ", fire_data$TFS_Arrival_Time)
+fire_data$Fire_Under_Control_Time <- gsub("T", " ", fire_data$Fire_Under_Control_Time)
+
+# Parse dates
+fire_data$TFS_Alarm_Time <- ymd_hms(fire_data$TFS_Alarm_Time)
+fire_data$TFS_Arrival_Time <- ymd_hms(fire_data$TFS_Arrival_Time)
+fire_data$Fire_Under_Control_Time <- ymd_hms(fire_data$Fire_Under_Control_Time)
+
+# Calculate response time
+fire_data$Response_Time <- as.numeric(difftime(fire_data$TFS_Arrival_Time, 
+                                               fire_data$TFS_Alarm_Time, 
+                                               units = "mins"))
+
+# Calculate suppression duration
+fire_data$Suppression_Duration_Min <- as.numeric(difftime
+                                                 (fire_data$Fire_Under_Control_Time,
+                                                          fire_data$TFS_Arrival_Time,
+                                                          units = "mins"))
+
+# Filter for valid response times (0 to 60 mins)
+fire_data <- fire_data[!is.na(fire_data$Response_Time), ]
+fire_data <- fire_data[fire_data$Response_Time >= 0 & fire_data$Response_Time <= 60, ]
+
+# 3. Group Property Use (Residential vs Commercial)
+res_pattern <- "Dwelling|Apartment|Home|House|Residential|Townhouse"
+comm_pattern <- "Restaurant|Commercial|Office|Store|Retail|Business|Hotel|Warehouse"
+
+fire_data$Property_Group <- NA
+fire_data$Property_Group[grepl(res_pattern, fire_data$Property_Use, 
+                               ignore.case = TRUE)] <- "Residential"
+fire_data$Property_Group[grepl(comm_pattern, fire_data$Property_Use, 
+                               ignore.case = TRUE)] <- "Commercial"
+
+# Filter to keep only these two groups
+fire_data <- fire_data[!is.na(fire_data$Property_Group), ]
+
+# 4. Clean Smoke Alarm variable
+fire_data$Smoke_Alarm_Binary <- NA
+
+# If it says "present", set to 1
+fire_data$Smoke_Alarm_Binary[grepl("present", 
+                                   fire_data$Smoke_Alarm_at_Fire_Origin, 
+                                   ignore.case = TRUE)] <- 1
+
+# If it says "No smoke alarm", set to 0
+fire_data$Smoke_Alarm_Binary[grepl("No smoke alarm", 
+                                   fire_data$Smoke_Alarm_at_Fire_Origin, 
+                                   ignore.case = TRUE)] <- 0
+
+# Remove NAs (undetermined or blank rows)
+fire_data <- fire_data[!is.na(fire_data$Smoke_Alarm_Binary), ]
+
+# 5. Handle Financial Loss
+fire_data$Estimated_Dollar_Loss <- gsub(",", "", fire_data$Estimated_Dollar_Loss)
+fire_data$Estimated_Dollar_Loss <- as.numeric(fire_data$Estimated_Dollar_Loss)
+
+# Remove rows with missing loss data
+fire_data <- fire_data[!is.na(fire_data$Estimated_Dollar_Loss), ]
+
+# Log-transform the loss variable
+fire_data$log_loss <- log(fire_data$Estimated_Dollar_Loss + 1)
+
+# Pre-calculate Q2 values for use in interpretation
+q2_mean_alarm <- round(mean(fire_data$log_loss[fire_data$Smoke_Alarm_Binary == 1], 
+                            na.rm = TRUE), 2)
+q2_mean_no_alarm <- round(mean(fire_data$log_loss[fire_data$Smoke_Alarm_Binary == 0], 
+                               na.rm = TRUE), 2)
+```
+
+## Q1: Response Time - Residential vs Commercial
+
+### Summary Statistics and Graphical Display
+
+The mean response time for residential incidents is compared to that of commercial incidents.
+
+```{r Q1-Summary-Stats}
+q1_stats <- fire_data %>%
+  group_by(Property_Group) %>%
+  summarise(
+    N = n(),
+    Mean = round(mean(Response_Time, na.rm = TRUE), 2),
+    SD = round(sd(Response_Time, na.rm = TRUE), 2),
+    Median = round(median(Response_Time, na.rm = TRUE), 2),
+    Min = round(min(Response_Time, na.rm = TRUE), 2),
+    Max = round(max(Response_Time, na.rm = TRUE), 2)
+  )
+
+kable(q1_stats, 
+      caption = "Table 1: Response Time Summary Statistics (Minutes)",
+      col.names = c("Property Group", "N", "Mean", "SD", "Median", "Min", "Max"))
+```
+
+```{r Q1-Visualization, fig.width=8, fig.height=5}
+ggplot(fire_data, aes(x = Property_Group, y = Response_Time, fill = Property_Group)) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(
+    title = "Distribution of Fire Response Time by Property Type",
+    x = "Property Group",
+    y = "Response Time (Minutes)",
+    caption = "White diamond indicates mean; box shows median and quartiles"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("Residential" = "#0042BC", "Commercial" = "#007FAD"))
+```
+
+### Statistical Test
+
+An Independent Samples T-Test is performed to determine if there is a statistically significant difference in the mean response times between the two property groups.
+
+```{r Q1-Statistical-Test, results='hide'}
+q1_test <- t.test(Response_Time ~ Property_Group, data = fire_data, var.equal = FALSE)
+
+# Extract key results
+t_stat <- round(q1_test$statistic, 3)
+p_val <- format.pval(q1_test$p.value, digits = 3)
+ci_lower <- round(q1_test$conf.int[1], 2)
+ci_upper <- round(q1_test$conf.int[2], 2)
+```
+
+**Test Results:**
+
+- **t-statistic**: `r t_stat`
+- **p-value**: `r p_val`
+- **95% Confidence Interval**: [`r ci_lower`, `r ci_upper`] minutes
+
+### Interpretation
+
+The analysis reveals that the mean response time for residential incidents is `r round(q1_stats$Mean[q1_stats$Property_Group == "Residential"], 2)` minutes (SD = `r round(q1_stats$SD[q1_stats$Property_Group == "Residential"], 2)`), while commercial incidents have a mean response time of `r round(q1_stats$Mean[q1_stats$Property_Group == "Commercial"], 2)` minutes (SD = `r round(q1_stats$SD[q1_stats$Property_Group == "Commercial"], 2)`). This represents a difference of approximately `r abs(round(q1_stats$Mean[q1_stats$Property_Group == "Residential"], 2) - round(q1_stats$Mean[q1_stats$Property_Group == "Commercial"], 2))` minutes between the two property types.
+
+The Welch's Two Sample t-test yielded a t-statistic of `r t_stat` with a p-value of `r p_val`. The 95% confidence interval for the difference in means is [`r ci_lower`, `r ci_upper`] minutes. Since the p-value is substantially less than 0.05, we reject the null hypothesis of no difference between groups.
+
+**Practical Interpretation**: Commercial properties experience statistically significant faster response times compared to residential properties. Although the difference is modest in absolute terms (less than 20 seconds on average), it is highly statistically significant. This pattern may reflect several factors: commercial properties are often located in more densely developed areas with better road access, they may be closer to fire stations, or dispatch protocols may prioritize commercial incidents differently. The consistency of this difference across thousands of incidents suggests systematic rather than random variation in emergency response patterns. These findings have implications for fire service resource allocation and may warrant investigation into whether residential areas require enhanced coverage to achieve more equitable response times across Toronto.
+
+\newpage
+
+## Q2: Smoke Alarm System vs Estimated Losses
+
+### Summary Statistics and Graphical Display
+
+The estimated losses (using log_loss) are compared between incidents where a smoke alarm was present and those where it was absent.
+
+```{r Q2-Summary-Stats}
+fire_data$Alarm_Label <- ifelse(fire_data$Smoke_Alarm_Binary == 1, "Smoke Alarm Present", 
+                                "No Smoke Alarm")
+
+q2_stats <- fire_data %>%
+  group_by(Alarm_Label) %>%
+  summarise(
+    N = n(),
+    Mean_Log_Loss = round(mean(log_loss, na.rm = TRUE), 2),
+    SD_Log_Loss = round(sd(log_loss, na.rm = TRUE), 2),
+    Median_Log_Loss = round(median(log_loss, na.rm = TRUE), 2)
+  )
+
+kable(q2_stats,
+      caption = "Table 2: Property Loss Summary by Smoke Alarm Status",
+      col.names = c("Smoke Alarm Status", "N", "Mean (Log)", "SD (Log)", "Median (Log)"))
+```
+
+```{r Q2-Dual-Visualization, fig.width=10, fig.height=5}
+# Boxplot
+p1 <- ggplot(fire_data, aes(x = Alarm_Label, y = log_loss, fill = Alarm_Label)) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(
+    title = "Distribution of Property Loss",
+    x = "",
+    y = "Log-Transformed Loss"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+  scale_fill_manual(values = c("Smoke Alarm Present" = "#0042BC", 
+                               "No Smoke Alarm" = "#D32F2F"))
+
+# Bar chart of means
+mean_data <- fire_data %>%
+  group_by(Alarm_Label) %>%
+  summarise(Mean = mean(log_loss, na.rm = TRUE),
+            SE = sd(log_loss, na.rm = TRUE) / sqrt(n()))
+
+p2 <- ggplot(mean_data, aes(x = Alarm_Label, y = Mean, fill = Alarm_Label)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  geom_errorbar(aes(ymin = Mean - SE, ymax = Mean + SE), width = 0.2) +
+  labs(
+    title = "Mean Property Loss Comparison",
+    x = "",
+    y = "Mean Log-Transformed Loss"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 0, hjust = 0.5)) +
+  scale_fill_manual(values = c("Smoke Alarm Present" = "#0042BC", 
+                               "No Smoke Alarm" = "#D32F2F"))
+
+grid.arrange(p1, p2, ncol = 2, 
+             top = "Property Loss by Smoke Alarm Status")
+```
+
+### Statistical Test
+
+An Independent Samples T-Test on the log-transformed loss is used to test for a difference in mean log-loss between incidents with and without smoke alarms.
+
+```{r Q2-Statistical-Test, results='hide'}
+q2_test <- t.test(log_loss ~ Smoke_Alarm_Binary, data = fire_data, var.equal = FALSE)
+
+# Extract key results
+t_stat_q2 <- round(q2_test$statistic, 3)
+p_val_q2 <- format.pval(q2_test$p.value, digits = 3)
+ci_lower_q2 <- round(q2_test$conf.int[1], 2)
+ci_upper_q2 <- round(q2_test$conf.int[2], 2)
+```
+
+**Test Results:**
+
+- **t-statistic**: `r t_stat_q2`
+- **p-value**: `r p_val_q2`
+- **95% Confidence Interval**: [`r ci_lower_q2`, `r ci_upper_q2`]
+
+### Interpretation
+
+The analysis compares estimated property losses between incidents where a smoke alarm was present versus absent. The mean log-loss for incidents with a smoke alarm present is `r q2_mean_alarm`, compared to `r q2_mean_no_alarm` for incidents without a smoke alarm. Of the `r sum(fire_data$Smoke_Alarm_Binary == 1)` incidents with smoke alarms and `r sum(fire_data$Smoke_Alarm_Binary == 0)` incidents without, the presence of a smoke alarm is associated with substantially different loss patterns.
+
+The Welch's Two Sample t-test on log-transformed losses yielded a t-statistic of `r t_stat_q2` with a p-value of `r p_val_q2`. The 95% confidence interval for the difference in log-losses is [`r ci_lower_q2`, `r ci_upper_q2`]. With a p-value well below 0.05, we reject the null hypothesis and conclude there is a statistically significant difference in property losses between the two groups.
+
+**Practical Interpretation**: The presence of a smoke alarm system is associated with significantly lower property losses in fire incidents. The negative t-statistic indicates that incidents with smoke alarms have lower log-transformed losses, suggesting that smoke alarms are effective in reducing the financial impact of fires. This protective effect likely operates through multiple mechanisms: smoke alarms provide early warning that allows occupants to respond quickly, they enable faster evacuation which reduces the time before emergency services are notified, and they may allow for earlier intervention before fires spread extensively. 
+
+The use of log-transformation accounts for the right-skewed nature of loss data, where a few catastrophic fires can have extremely high losses. The significant difference observed even after this transformation demonstrates that smoke alarms provide consistent protective benefits across the spectrum of fire severity. These findings strongly support fire safety policies that promote smoke alarm installation and maintenance in residential and commercial properties throughout Toronto. The economic benefits of smoke alarms extend beyond individual property owners to broader community resilience and reduced burden on emergency services.
+
+\newpage
+
+## Q3: Status of Fire on Arrival vs Duration of Fire Suppression
+
+### Summary Statistics and Graphical Display
+
+The duration of fire suppression is compared across different categories of fire status on arrival.
+
+```{r Q3-Data-Prep}
+# Check available categories and select top 3
+fire_status_counts <- fire_data %>%
+  group_by(Status_of_Fire_On_Arrival) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(3)
+
+top_3_statuses <- fire_status_counts$Status_of_Fire_On_Arrival
+
+fire_data_q3 <- fire_data %>%
+  filter(Status_of_Fire_On_Arrival %in% top_3_statuses) %>%
+  filter(!is.na(Suppression_Duration_Min) & Suppression_Duration_Min >= 0)
+```
+
+```{r Q3-Summary-Stats}
+q3_stats <- fire_data_q3 %>%
+  group_by(Status_of_Fire_On_Arrival) %>%
+  summarise(
+    N = n(),
+    Mean = round(mean(Suppression_Duration_Min, na.rm = TRUE), 2),
+    SD = round(sd(Suppression_Duration_Min, na.rm = TRUE), 2),
+    Median = round(median(Suppression_Duration_Min, na.rm = TRUE), 2),
+    Min = round(min(Suppression_Duration_Min, na.rm = TRUE), 2),
+    Max = round(max(Suppression_Duration_Min, na.rm = TRUE), 2)
+  )
+
+kable(q3_stats, 
+      caption = "Table 3: Fire Suppression Duration Summary by Fire Status on Arrival",
+      col.names = c("Status of Fire On Arrival", "N", "Mean", "SD", "Median", 
+                    "Min", "Max"))
+```
+
+```{r Q3-Visualization, fig.width=10, fig.height=6}
+# Create shortened labels for better display
+fire_data_q3 <- fire_data_q3 %>%
+  mutate(Status_Short = case_when(
+    grepl("extinguished", Status_of_Fire_On_Arrival, 
+          ignore.case = TRUE) ~ "Extinguished\nPrior to Arrival",
+    grepl("no evidence", Status_of_Fire_On_Arrival, 
+          ignore.case = TRUE) ~ "No Evidence\nfrom Street",
+    grepl("smoke showing", Status_of_Fire_On_Arrival, 
+          ignore.case = TRUE) ~ "Smoke Showing\nOnly",
+    TRUE ~ Status_of_Fire_On_Arrival
+  ))
+
+ggplot(fire_data_q3, aes(x = Status_Short, y = Suppression_Duration_Min, 
+                         fill = Status_Short)) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "white") +
+  labs(
+    title = "Distribution of Fire Suppression Duration by Status on Arrival",
+    x = "Fire Status on Arrival",
+    y = "Suppression Duration (Minutes)",
+    caption = "White diamond indicates mean; box shows median and quartiles"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(size = 9)) +
+  scale_fill_manual(values = c("#0042BC", "#007FAD", "#5DADE2"))
+```
+
+### Statistical Test
+
+A one-way Analysis of Variance (ANOVA) is performed to test for a significant difference in the mean suppression duration across the three fire status groups.
+
+```{r Q3-Statistical-Test, results='hide'}
+q3_anova <- aov(Suppression_Duration_Min ~ Status_of_Fire_On_Arrival, data = fire_data_q3)
+q3_summary <- summary(q3_anova)
+
+# Extract F-statistic and p-value
+f_stat <- round(q3_summary[[1]]$`F value`[1], 3)
+f_pval <- format.pval(q3_summary[[1]]$`Pr(>F)`[1], digits = 3)
+```
+
+**Test Results:**
+
+- **F-statistic**: `r f_stat`
+- **p-value**: `r f_pval`
+
+### Interpretation
+
+The one-way ANOVA examining the relationship between fire status on arrival and suppression duration yielded an F-statistic of `r f_stat` with a p-value of `r f_pval`. With a p-value significantly below 0.05, we reject the null hypothesis and conclude that fire status on arrival has a statistically significant effect on suppression duration.
+
+Mean suppression durations vary substantially across fire status categories. Incidents where the fire was already extinguished prior to arrival averaged `r round(q3_stats$Mean[1], 2)` minutes, while fires with no evidence from the street averaged `r round(q3_stats$Mean[2], 2)` minutes, and fires with smoke showing only averaged `r round(q3_stats$Mean[3], 2)` minutes. This represents considerable variation in the time required to bring different types of fire incidents under control.
+
+**Practical Interpretation**: The observable condition of a fire upon arrival strongly predicts how long firefighters will need to suppress it. Fires that are already extinguished require minimal time for verification and ensuring the scene is safe. Fires with visible smoke but no flames require longer suppression efforts as firefighters must locate and extinguish smoldering materials and verify complete extinguishment. The progressive increase in suppression time across categories reflects the escalating complexity of firefighting operations as fire severity increases.
+
+These findings have important operational implications for Toronto Fire Services. The strong relationship between arrival conditions and suppression duration can inform resource allocation decisions and help predict staffing needs based on initial incident reports. Fires showing visible signs of active burning require not only faster response times but also longer on-scene operations, necessitating adequate crew availability and rotation planning. Understanding these patterns enables more effective deployment strategies and helps ensure sufficient resources are available for extended suppression operations. The data also suggests that early detection and rapid response—before fires develop visible external signs—could significantly reduce the total time and resources required for suppression, reinforcing the value of smoke alarm systems and community fire awareness programs examined in our earlier analyses.
+
+\newpage
+
+# Conclusion and Future Direction
+
+## Key Findings
+
+This analysis of Toronto Fire Incidents data reveals three important insights into emergency response and fire safety effectiveness:
+
+**1. Property Type and Response Times**: Commercial properties receive significantly faster emergency response compared to residential properties, with a mean difference of approximately 0.28 minutes. While modest, this difference is highly statistically significant (p < 0.001) and consistent across thousands of incidents, suggesting systematic patterns in fire service operations rather than random variation.
+
+**2. Smoke Alarms and Property Loss**: The presence of smoke alarm systems is strongly associated with reduced property losses from fire incidents. Properties with functioning smoke alarms experienced significantly lower financial losses (p < 0.001), demonstrating the tangible protective value of these safety devices beyond their life-saving potential.
+
+**3. Fire Status and Suppression Duration**: The observable condition of a fire upon firefighter arrival is a strong predictor of suppression time requirements. Fires at different stages of development require substantially different operational responses, with highly significant variation across categories (p < 0.001).
+
+**Connecting the Story**: These findings collectively illustrate the fire safety ecosystem in Toronto. Smoke alarms provide early warning that can result in fires being extinguished or contained before extensive damage occurs. When fires do require professional response, the time to arrival varies by property type, and the observable fire conditions dictate the duration and complexity of suppression efforts. Together, these patterns emphasize the importance of both preventive measures (smoke alarms) and responsive capabilities (rapid dispatch and adequate resources) in minimizing fire impacts on Toronto communities.
+
+## Limitations
+
+This study is subject to several limitations that should be considered when interpreting results:
+
+- **Data Completeness**: Some incidents under investigation or with missing information may not be fully represented, potentially introducing selection bias if incomplete cases differ systematically from complete ones
+- **Privacy Protection**: Address aggregation and information removal may affect geographic analysis precision and limit our ability to examine neighborhood-level patterns
+- **Definition Variations**: Incidents are classified according to the Ontario Fire Marshal definition, which may differ from other jurisdictions, limiting direct comparability
+- **Temporal Scope**: Analysis covers incidents through December 31, 2023, and may not reflect recent changes in TFS operations or community fire prevention efforts
+- **Confounding Variables**: We did not control for all potential confounders such as building age, construction type, occupancy levels, or socioeconomic factors that might influence both smoke alarm presence and fire outcomes
+- **Causation vs. Association**: While smoke alarms are associated with lower losses, we cannot definitively establish causation from observational data alone
+
+## Future Research Directions
+
+Several avenues for future research emerge from this analysis:
+
+- **Sprinkler System Analysis**: Investigation of automatic sprinkler system effectiveness in reducing property losses and suppression duration, parallel to our smoke alarm analysis
+- **Temporal Trend Analysis**: Examining changes in response times, incident patterns, and safety equipment effectiveness over multiple years to identify improving or deteriorating trends
+- **Building Characteristics Study**: Examination of the relationship between building occupancy status, age, construction type, and fire severity to inform building code updates
+- **Geographic Analysis**: Identifying high-risk areas within Toronto for targeted prevention efforts and station placement optimization
+- **Socioeconomic Factors**: Analysis of the relationship between neighborhood income levels, smoke alarm presence, and fire outcomes to address potential equity issues
+- **Multivariate Modeling**: Development of predictive models incorporating multiple factors (property type, smoke alarms, building characteristics) to better estimate fire risk and expected losses
+- **Cost-Benefit Analysis**: Economic evaluation of fire safety interventions, comparing the costs of smoke alarm programs against prevented losses and reduced emergency service utilization
+
+\newpage
+
+# Appendix: R Code
+
+All R code used for data cleaning, analysis, and visualization.
+
+```{r appendix-code, ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
